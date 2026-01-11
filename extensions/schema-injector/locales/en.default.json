@@ -1,0 +1,4 @@
+{
+  "name": "AI-GEO Schema Injector",
+  "description": "Injects machine-readable JSON-LD product data for AI search engines like ChatGPT and Perplexity."
+}

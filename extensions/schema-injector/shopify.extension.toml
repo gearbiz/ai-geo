@@ -1,0 +1,10 @@
+# Theme App Extension: Schema Injector
+# Injects JSON-LD structured data from metafields into product pages
+
+api_version = "2026-04"
+uid = "591b8656-ec1c-0632-cf73-153550a49b52126f59bb"
+type = "theme"
+name = "AI-GEO Schema Injector"
+
+[settings]
+# App Embed blocks are configured in the blocks/ directory

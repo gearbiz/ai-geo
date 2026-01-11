@@ -1,0 +1,45 @@
+{%- comment -%}
+  AI-GEO Schema Injector - App Embed Block
+  
+  Purpose: Inject JSON-LD structured data for LLM discoverability.
+  Source: Reads from a private metafield set by our backend.
+  
+  PRD Requirement: "NEVER touches theme.liquid or body_html"
+  This block is enabled via Theme Editor > App Embeds
+{%- endcomment -%}
+
+{%- liquid
+  # Only render on product pages
+  if template.name != 'product'
+    break
+  endif
+
+  # Read the JSON-LD schema from our app's private metafield
+  # Namespace: ai_geo (private to our app)
+  # Key: product_schema
+  assign schema_json = product.metafields.ai_geo.product_schema.value
+
+  # Exit if no schema exists for this product
+  if schema_json == blank
+    break
+  endif
+-%}
+
+{%- comment -%}
+  Output the JSON-LD script tag
+  This is what ChatGPT, Perplexity, and Google read
+{%- endcomment -%}
+<script type="application/ld+json">
+  {{ schema_json }}
+</script>
+
+{% schema %}
+{
+  "name": "AI-GEO Schema",
+  "target": "head",
+  "enabled_on": {
+    "templates": ["product"]
+  },
+  "settings": []
+}
+{% endschema %}

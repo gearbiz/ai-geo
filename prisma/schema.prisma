@@ -1,0 +1,60 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
+// enough when changing adapters.
+// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
+datasource db {
+  provider = "sqlite"
+  url      = "file:dev.sqlite"
+}
+
+model Session {
+  id            String    @id
+  shop          String
+  state         String
+  isOnline      Boolean   @default(false)
+  scope         String?
+  expires       DateTime?
+  accessToken   String
+  userId        BigInt?
+  firstName     String?
+  lastName      String?
+  email         String?
+  accountOwner  Boolean   @default(false)
+  locale        String?
+  collaborator  Boolean?  @default(false)
+  emailVerified Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+}
+
+// ProductState: Stores hash + cached schema for each product (PRD Section 2 & 3B)
+// Used by the "Stale Data Guard" to prevent unnecessary AI regeneration
+model ProductState {
+  id               String    @id @default(uuid())
+  shop             String    // The Shop domain (e.g., "my-store.myshopify.com")
+  shopifyProductId String    @unique // Shopify's product GID
+  contentHash      String    // SHA-256 hash from generateProductHash()
+  schemaBlob       String?   // Cached JSON-LD schema (optional until generated)
+  isSynced         Boolean   @default(false) // True when schema is injected to store
+  lastScannedAt    DateTime  @default(now()) // Last time product was checked
+
+  @@index([shop]) // Index for querying all products by shop
+}
+
+// Shop: Stores shop-level settings including credit balance (PRD Section 2)
+// Used by CreditService to enforce "No-Spam" generation limits
+model Shop {
+  id          String    @id @default(uuid())
+  domain      String    @unique // The shop domain (e.g., "my-store.myshopify.com")
+  credits     Int       @default(10) // Standardization credits (default 10 for new shops)
+  brandVoice  String?   // Global brand voice setting (PRD Section 3A)
+  isOnboarded Boolean   @default(false) // True after Golden Sample is approved
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
