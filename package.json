@@ -2,7 +2,7 @@
   "name": "ai-geo",
   "private": true,
   "scripts": {
-    "build": "react-router build",
+    "build": "prisma generate && react-router build",
     "dev": "shopify app dev",
     "test": "vitest run",
     "test:watch": "vitest",
