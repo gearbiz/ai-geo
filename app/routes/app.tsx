@@ -8,7 +8,6 @@ import { authenticate } from "../shopify.server";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
 
-  // eslint-disable-next-line no-undef
   return { apiKey: process.env.SHOPIFY_API_KEY || "" };
 };
 
@@ -18,8 +17,14 @@ export default function App() {
   return (
     <AppProvider embedded apiKey={apiKey}>
       <s-app-nav>
-        <s-link href="/app">Dashboard</s-link>
-        <s-link href="/app/onboarding">Setup</s-link>
+        <s-link href="/app">
+          <span style={{ marginRight: '6px' }}>📊</span>
+          Dashboard
+        </s-link>
+        <s-link href="/app/onboarding">
+          <span style={{ marginRight: '6px' }}>🎨</span>
+          Brand Voice
+        </s-link>
       </s-app-nav>
       <Outlet />
     </AppProvider>

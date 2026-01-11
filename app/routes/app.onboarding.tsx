@@ -1,10 +1,8 @@
 /**
  * Feature D: Golden Sample Onboarding UI
  * 
- * "Zero-Decision" setup flow where merchants:
- * 1. Select a Brand Tone
- * 2. Preview AI-generated JSON-LD on their first product
- * 3. Approve & lock in the style for their entire store
+ * Premium 2026 Design - "Zero-Decision" setup flow
+ * Dark mode with emerald accents and glassmorphism
  */
 
 import { useState } from 'react';
@@ -22,15 +20,18 @@ import { generateProductSchema } from '../services/ai.server';
 // Brand tone options with their AI prompts
 const BRAND_TONES = {
   minimalist: {
-    label: 'Minimalist (Facts Only)',
+    label: 'Minimalist',
+    description: 'Clean, factual, no fluff',
     prompt: 'Be extremely concise. Focus only on factual specifications. No marketing language. Just the facts.',
   },
   storyteller: {
-    label: 'Storyteller (Warm)',
+    label: 'Storyteller',
+    description: 'Warm, engaging, emotional',
     prompt: 'Be warm and engaging. Tell the story behind the product. Use inviting language that connects emotionally.',
   },
   enterprise: {
-    label: 'Enterprise (Professional)',
+    label: 'Enterprise',
+    description: 'Professional, authoritative',
     prompt: 'Be professional and authoritative. Emphasize quality, reliability, and business value. Formal tone.',
   },
 } as const;
@@ -106,10 +107,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     shopDomain,
     product,
     credits: shop?.credits ?? 10,
-    brandTones: Object.entries(BRAND_TONES).map(([key, value]) => ({
-      value: key,
-      label: value.label,
-    })),
   };
 };
 
@@ -120,7 +117,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const intent = formData.get('intent');
 
   if (intent === 'generate') {
-    // Generate preview schema
     const brandTone = formData.get('brandTone') as BrandTone;
     const productJson = formData.get('product') as string;
     
@@ -155,7 +151,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   if (intent === 'approve') {
-    // Save brand tone and mark as onboarded
     const brandTone = formData.get('brandTone') as BrandTone;
     
     if (!brandTone) {
@@ -184,7 +179,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Onboarding() {
-  const { product, credits, brandTones } = useLoaderData<typeof loader>();
+  const { product, credits } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   
   const [selectedTone, setSelectedTone] = useState<BrandTone>('minimalist');
@@ -197,7 +192,6 @@ export default function Onboarding() {
   const error = fetcher.data?.error;
   const creditsRemaining = fetcher.data?.creditsRemaining ?? credits;
 
-  // Track when we've generated a preview
   if (schema && !hasGenerated) {
     setHasGenerated(true);
   }
@@ -225,162 +219,216 @@ export default function Onboarding() {
     );
   };
 
+  // No products state
   if (!product) {
     return (
-      <s-page heading="No Products Found">
-        <s-section>
-          <s-banner status="warning">
-            <s-text>
+      <div className="geo-app">
+        <div className="geo-page">
+          <div className="geo-header">
+            <div className="geo-header__badge">⚠️ Setup Required</div>
+            <h1 className="geo-header__title">No Products Found</h1>
+            <p className="geo-header__subtitle">
               You need at least one product in your store to set up AI-GEO.
               Please add a product and refresh this page.
-            </s-text>
-          </s-banner>
-        </s-section>
-      </s-page>
+            </p>
+          </div>
+        </div>
+      </div>
     );
   }
 
   return (
-    <s-page heading="Set Up Your Brand Voice">
-      <s-section>
-        <s-text>
-          Let's configure how AI-GEO describes your products. Choose a tone, preview
-          the result on your first product, then approve to apply it store-wide.
-        </s-text>
-      </s-section>
+    <div className="geo-app">
+      <div className="geo-page">
+        {/* Header */}
+        <header className="geo-header geo-animate-in">
+          <div className="geo-header__badge">
+            <span>✨</span>
+            <span>Quick Setup</span>
+          </div>
+          <h1 className="geo-header__title">Define Your Brand Voice</h1>
+          <p className="geo-header__subtitle">
+            Choose how AI describes your products. Preview the result, then apply it store-wide with one click.
+          </p>
+        </header>
 
-      <s-layout columns="1fr 1fr">
-        {/* Left Column: Controls */}
-        <s-layout-item>
-          <s-card>
-            <s-stack direction="block" gap="loose">
-              <s-heading>1. Choose Your Brand Tone</s-heading>
+        {/* Main Content - Bento Grid */}
+        <div className="geo-bento geo-bento--onboarding">
+          {/* Left Column: Steps */}
+          <div className="geo-bento__steps">
+            <div className="geo-card geo-animate-in geo-animate-delay-1">
+              {/* Step 1: Brand Tone */}
+              <div className="geo-card__header">
+                <div className="geo-card__number">1</div>
+                <div>
+                  <h2 className="geo-card__title">Choose Your Tone</h2>
+                </div>
+              </div>
               
-              <s-select
-                label="Brand Tone"
+              <label className="geo-label">Brand Voice Style</label>
+              <select 
+                className="geo-select"
                 value={selectedTone}
-                onChange={(e: CustomEvent) => setSelectedTone(e.detail as BrandTone)}
+                onChange={(e) => setSelectedTone(e.target.value as BrandTone)}
               >
-                {brandTones.map((tone) => (
-                  <s-option key={tone.value} value={tone.value}>
-                    {tone.label}
-                  </s-option>
+                {Object.entries(BRAND_TONES).map(([key, tone]) => (
+                  <option key={key} value={key}>
+                    {tone.label} — {tone.description}
+                  </option>
                 ))}
-              </s-select>
+              </select>
 
-              <s-divider />
+              <hr className="geo-divider" />
 
-              <s-heading>2. Your Test Product</s-heading>
+              {/* Step 2: Test Product */}
+              <div className="geo-card__header">
+                <div className="geo-card__number">2</div>
+                <div>
+                  <h2 className="geo-card__title">Your Test Product</h2>
+                </div>
+              </div>
               
-              <s-box padding="base" background="subdued" borderRadius="base">
-                <s-stack direction="block" gap="tight">
-                  <s-text fontWeight="bold">{product.title}</s-text>
-                  <s-text color="subdued">by {product.vendor}</s-text>
-                  {product.description && (
-                    <s-text>
-                      {product.description.slice(0, 150)}
-                      {product.description.length > 150 ? '...' : ''}
-                    </s-text>
-                  )}
-                </s-stack>
-              </s-box>
-
-              <s-divider />
-
-              <s-heading>3. Generate Preview</s-heading>
+              <p className="geo-card__description">
+                We'll use this product to preview how your brand voice sounds.
+              </p>
               
-              <s-stack direction="inline" gap="tight" align="center">
-                <s-button
-                  variant="primary"
+              <div className="geo-product">
+                {product.imageUrl ? (
+                  <img 
+                    src={product.imageUrl} 
+                    alt={product.title}
+                    className="geo-product__image"
+                  />
+                ) : (
+                  <div className="geo-product__image geo-product__image--placeholder">
+                    📦
+                  </div>
+                )}
+                <div className="geo-product__info">
+                  <h3 className="geo-product__title">{product.title}</h3>
+                  <p className="geo-product__vendor">by {product.vendor}</p>
+                </div>
+              </div>
+
+              <hr className="geo-divider" />
+
+              {/* Step 3: Generate */}
+              <div className="geo-card__header">
+                <div className="geo-card__number">3</div>
+                <div>
+                  <h2 className="geo-card__title">Generate Preview</h2>
+                </div>
+              </div>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)', marginTop: 'var(--space-md)' }}>
+                <button 
+                  className={`geo-btn geo-btn--primary ${isGenerating ? 'geo-btn--loading' : ''}`}
                   onClick={handleGenerate}
                   disabled={isGenerating}
-                  loading={isGenerating}
                 >
-                  {isGenerating ? 'Generating...' : 'Generate Preview'}
-                </s-button>
-                <s-text color="subdued">
-                  Credits: {creditsRemaining}
-                </s-text>
-              </s-stack>
+                  {isGenerating && <span className="geo-btn__spinner" />}
+                  {isGenerating ? 'Generating...' : '⚡ Generate Preview'}
+                </button>
+                <span className="geo-badge geo-badge--credits">
+                  {creditsRemaining} credits
+                </span>
+              </div>
 
               {error && (
-                <s-banner status="critical">
-                  <s-text>{error}</s-text>
-                </s-banner>
+                <div className="geo-alert geo-alert--error">
+                  <span className="geo-alert__icon">⚠️</span>
+                  <span>{error}</span>
+                </div>
               )}
-            </s-stack>
-          </s-card>
-        </s-layout-item>
+            </div>
+          </div>
 
-        {/* Right Column: Preview Result */}
-        <s-layout-item>
-          <s-card>
-            <s-stack direction="block" gap="loose">
-              <s-heading>JSON-LD Preview</s-heading>
-              <s-text color="subdued">
-                This is what AI search engines (ChatGPT, Perplexity) will see.
-              </s-text>
+          {/* Right Column: Preview */}
+          <div className="geo-bento__preview">
+            <div className="geo-card geo-card--featured geo-animate-in geo-animate-delay-2">
+              <div className="geo-card__header">
+                <div className="geo-card__icon">🔮</div>
+                <div>
+                  <h2 className="geo-card__title">JSON-LD Preview</h2>
+                  <p className="geo-card__description" style={{ marginTop: '4px' }}>
+                    What AI search engines will see
+                  </p>
+                </div>
+              </div>
 
-              <s-box
-                padding="base"
-                background="subdued"
-                borderRadius="base"
-                borderWidth="base"
-                style={{ minHeight: '300px' }}
-              >
+              <div className={`geo-code ${!schema && !isGenerating ? 'geo-code--empty' : ''}`}>
                 {isGenerating ? (
-                  <s-stack direction="block" gap="tight">
-                    <s-skeleton-body-text lines={3} />
-                    <s-skeleton-body-text lines={4} />
-                    <s-skeleton-body-text lines={2} />
-                  </s-stack>
+                  <div>
+                    <div className="geo-skeleton geo-skeleton--line" />
+                    <div className="geo-skeleton geo-skeleton--line" />
+                    <div className="geo-skeleton geo-skeleton--line" />
+                    <div className="geo-skeleton geo-skeleton--line" style={{ width: '80%' }} />
+                    <div className="geo-skeleton geo-skeleton--line" style={{ width: '60%' }} />
+                    <div className="geo-skeleton geo-skeleton--line" />
+                    <div className="geo-skeleton geo-skeleton--line" style={{ width: '75%' }} />
+                  </div>
                 ) : schema ? (
-                  <pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: '13px' }}>
-                    <code>{JSON.stringify(schema, null, 2)}</code>
-                  </pre>
+                  <pre>{JSON.stringify(schema, null, 2)}</pre>
                 ) : (
-                  <s-stack direction="block" gap="base" align="center">
-                    <s-text color="subdued" alignment="center">
-                      Click "Generate Preview" to see your AI-generated product schema.
-                    </s-text>
-                  </s-stack>
+                  <>
+                    <div className="geo-code__placeholder-icon">{ }</div>
+                    <p>Click "Generate Preview" to see your AI-generated product schema</p>
+                  </>
                 )}
-              </s-box>
+              </div>
 
               {schema && (
-                <s-banner status="success">
-                  <s-text>
-                    ✓ Schema generated successfully! Review it above, then approve to
-                    apply this style to your entire store.
-                  </s-text>
-                </s-banner>
+                <div className="geo-alert geo-alert--success">
+                  <span className="geo-alert__icon">✓</span>
+                  <span>Schema generated! Review it above, then approve to apply store-wide.</span>
+                </div>
               )}
-            </s-stack>
-          </s-card>
-        </s-layout-item>
-      </s-layout>
+            </div>
+          </div>
 
-      {/* Bottom Action Bar */}
-      <s-section>
-        <s-card>
-          <s-stack direction="inline" gap="base" align="center" distribute="space-between">
-            <s-text>
-              {hasGenerated
-                ? 'Happy with the preview? Lock it in for your entire store.'
-                : 'Generate a preview first to see how your products will be described.'}
-            </s-text>
-            <s-button
-              variant="primary"
-              onClick={handleApprove}
-              disabled={!hasGenerated || isApproving}
-              loading={isApproving}
-            >
-              {isApproving ? 'Saving...' : 'Approve & Standardize Entire Store'}
-            </s-button>
-          </s-stack>
-        </s-card>
-      </s-section>
-    </s-page>
+          {/* Bottom: Action Bar */}
+          <div className="geo-bento__action">
+            <div className="geo-card geo-card--action geo-animate-in geo-animate-delay-3">
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 'var(--space-lg)'
+              }}>
+                <div>
+                  <h3 style={{ 
+                    fontFamily: 'var(--font-display)', 
+                    fontSize: '1.25rem', 
+                    margin: '0 0 4px',
+                    color: 'var(--geo-text-primary)'
+                  }}>
+                    {hasGenerated ? 'Ready to Launch?' : 'Generate a Preview First'}
+                  </h3>
+                  <p style={{ 
+                    margin: 0, 
+                    color: 'var(--geo-text-muted)',
+                    fontSize: '0.9375rem'
+                  }}>
+                    {hasGenerated 
+                      ? 'Lock in this brand voice for your entire product catalog.' 
+                      : 'See how your products will be described before committing.'}
+                  </p>
+                </div>
+                <button 
+                  className={`geo-btn geo-btn--primary geo-btn--large ${isApproving ? 'geo-btn--loading' : ''}`}
+                  onClick={handleApprove}
+                  disabled={!hasGenerated || isApproving}
+                >
+                  {isApproving && <span className="geo-btn__spinner" />}
+                  {isApproving ? 'Saving...' : '🚀 Approve & Apply Store-Wide'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

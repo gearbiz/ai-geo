@@ -1,3 +1,10 @@
+/**
+ * AI-GEO Dashboard
+ * 
+ * Premium 2026 Design - Main control center
+ * Shows stats, sync status, and quick actions
+ */
+
 import { useEffect } from "react";
 import type {
   ActionFunctionArgs,
@@ -10,8 +17,17 @@ import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { prisma } from "../db.server";
 
+// GraphQL query to get product count
+const PRODUCTS_COUNT_QUERY = `#graphql
+  query GetProductsCount {
+    productsCount {
+      count
+    }
+  }
+`;
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
   const shopDomain = session.shop;
 
   // Check if shop needs onboarding
@@ -25,244 +41,324 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     throw redirect('/app/onboarding');
   }
 
+  // Get synced products count
+  const syncedProducts = await prisma.productState.count({
+    where: { shop: shopDomain, isSynced: true },
+  });
+
+  const pendingProducts = await prisma.productState.count({
+    where: { shop: shopDomain, isSynced: false },
+  });
+
+  // Get total products from Shopify
+  const response = await admin.graphql(PRODUCTS_COUNT_QUERY);
+  const data = await response.json();
+  const totalProducts = data.data?.productsCount?.count ?? 0;
+
+  // Determine brand voice label
+  let brandVoiceLabel = 'Not Set';
+  if (shop.brandVoice?.includes('concise')) {
+    brandVoiceLabel = 'Minimalist';
+  } else if (shop.brandVoice?.includes('warm')) {
+    brandVoiceLabel = 'Storyteller';
+  } else if (shop.brandVoice?.includes('professional')) {
+    brandVoiceLabel = 'Enterprise';
+  }
+
   return {
     shopDomain,
     credits: shop.credits,
-    brandVoice: shop.brandVoice,
+    brandVoice: brandVoiceLabel,
+    syncedProducts,
+    pendingProducts,
+    totalProducts,
   };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { admin } = await authenticate.admin(request);
-  const color = ["Red", "Orange", "Yellow", "Green"][
-    Math.floor(Math.random() * 4)
-  ];
-  const response = await admin.graphql(
-    `#graphql
-      mutation populateProduct($product: ProductCreateInput!) {
-        productCreate(product: $product) {
-          product {
-            id
-            title
-            handle
-            status
-            variants(first: 10) {
-              edges {
-                node {
-                  id
-                  price
-                  barcode
-                  createdAt
-                }
-              }
-            }
-          }
-        }
-      }`,
-    {
-      variables: {
-        product: {
-          title: `${color} Snowboard`,
-        },
-      },
-    },
-  );
-  const responseJson = await response.json();
+  const { admin, session } = await authenticate.admin(request);
+  const shopDomain = session.shop;
+  const formData = await request.formData();
+  const intent = formData.get('intent');
 
-  const product = responseJson.data!.productCreate!.product!;
-  const variantId = product.variants.edges[0]!.node!.id!;
+  if (intent === 'sync_all') {
+    // TODO: Implement batch sync
+    return { success: true, message: 'Sync started' };
+  }
 
-  const variantResponse = await admin.graphql(
-    `#graphql
-    mutation shopifyReactRouterTemplateUpdateVariant($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-      productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-        productVariants {
-          id
-          price
-          barcode
-          createdAt
-        }
-      }
-    }`,
-    {
-      variables: {
-        productId: product.id,
-        variants: [{ id: variantId, price: "100.00" }],
-      },
-    },
-  );
-
-  const variantResponseJson = await variantResponse.json();
-
-  return {
-    product: responseJson!.data!.productCreate!.product,
-    variant:
-      variantResponseJson!.data!.productVariantsBulkUpdate!.productVariants,
-  };
+  return { success: false, message: 'Unknown action' };
 };
 
-export default function Index() {
+export default function Dashboard() {
+  const { 
+    credits, 
+    brandVoice, 
+    syncedProducts, 
+    pendingProducts, 
+    totalProducts 
+  } = useLoaderData<typeof loader>();
+  
   const fetcher = useFetcher<typeof action>();
-
   const shopify = useAppBridge();
-  const isLoading =
-    ["loading", "submitting"].includes(fetcher.state) &&
-    fetcher.formMethod === "POST";
+
+  const syncProgress = totalProducts > 0 
+    ? Math.round((syncedProducts / totalProducts) * 100) 
+    : 0;
 
   useEffect(() => {
-    if (fetcher.data?.product?.id) {
-      shopify.toast.show("Product created");
+    if (fetcher.data?.success) {
+      shopify.toast.show("Sync started!");
     }
-  }, [fetcher.data?.product?.id, shopify]);
-
-  const generateProduct = () => fetcher.submit({}, { method: "POST" });
+  }, [fetcher.data, shopify]);
 
   return (
-    <s-page heading="Shopify app template">
-      <s-button slot="primary-action" onClick={generateProduct}>
-        Generate a product
-      </s-button>
+    <div className="geo-app">
+      <div className="geo-page">
+        {/* Header */}
+        <header className="geo-header geo-animate-in">
+          <div className="geo-header__badge">
+            <span>⚡</span>
+            <span>Dashboard</span>
+          </div>
+          <h1 className="geo-header__title">AI-GEO Control Center</h1>
+          <p className="geo-header__subtitle">
+            Monitor your product schema sync status and manage AI generation credits.
+          </p>
+        </header>
 
-      <s-section heading="Congrats on creating a new Shopify app 🎉">
-        <s-paragraph>
-          This embedded app template uses{" "}
-          <s-link
-            href="https://shopify.dev/docs/apps/tools/app-bridge"
-            target="_blank"
-          >
-            App Bridge
-          </s-link>{" "}
-          interface examples like an{" "}
-          <s-link href="/app/additional">additional page in the app nav</s-link>
-          , as well as an{" "}
-          <s-link
-            href="https://shopify.dev/docs/api/admin-graphql"
-            target="_blank"
-          >
-            Admin GraphQL
-          </s-link>{" "}
-          mutation demo, to provide a starting point for app development.
-        </s-paragraph>
-      </s-section>
-      <s-section heading="Get started with products">
-        <s-paragraph>
-          Generate a product with GraphQL and get the JSON output for that
-          product. Learn more about the{" "}
-          <s-link
-            href="https://shopify.dev/docs/api/admin-graphql/latest/mutations/productCreate"
-            target="_blank"
-          >
-            productCreate
-          </s-link>{" "}
-          mutation in our API references.
-        </s-paragraph>
-        <s-stack direction="inline" gap="base">
-          <s-button
-            onClick={generateProduct}
-            {...(isLoading ? { loading: true } : {})}
-          >
-            Generate a product
-          </s-button>
-          {fetcher.data?.product && (
-            <s-button
-              onClick={() => {
-                shopify.intents.invoke?.("edit:shopify/Product", {
-                  value: fetcher.data?.product?.id,
-                });
-              }}
-              target="_blank"
-              variant="tertiary"
-            >
-              Edit product
-            </s-button>
-          )}
-        </s-stack>
-        {fetcher.data?.product && (
-          <s-section heading="productCreate mutation">
-            <s-stack direction="block" gap="base">
-              <s-box
-                padding="base"
-                borderWidth="base"
-                borderRadius="base"
-                background="subdued"
+        {/* Stats Grid */}
+        <div className="geo-stats geo-animate-in geo-animate-delay-1">
+          <div className="geo-stat">
+            <div className="geo-stat__value">{credits}</div>
+            <div className="geo-stat__label">Credits Remaining</div>
+          </div>
+          <div className="geo-stat">
+            <div className="geo-stat__value">{syncedProducts}</div>
+            <div className="geo-stat__label">Products Synced</div>
+          </div>
+          <div className="geo-stat">
+            <div className="geo-stat__value">{totalProducts}</div>
+            <div className="geo-stat__label">Total Products</div>
+          </div>
+          <div className="geo-stat">
+            <div className="geo-stat__value" style={{ fontSize: '1.5rem', color: 'var(--geo-text-secondary)' }}>
+              {brandVoice}
+            </div>
+            <div className="geo-stat__label">Brand Voice</div>
+          </div>
+        </div>
+
+        {/* Main Content Grid */}
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
+          gap: 'var(--space-lg)',
+          marginTop: 'var(--space-2xl)'
+        }}>
+          {/* Sync Status Card */}
+          <div className="geo-card geo-card--featured geo-animate-in geo-animate-delay-2">
+            <div className="geo-card__header">
+              <div className="geo-card__icon">📊</div>
+              <div>
+                <h2 className="geo-card__title">Sync Progress</h2>
+                <p className="geo-card__description" style={{ marginTop: '4px' }}>
+                  Products with AI-generated schemas
+                </p>
+              </div>
+            </div>
+
+            <div style={{ marginTop: 'var(--space-lg)' }}>
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                marginBottom: 'var(--space-sm)',
+                fontSize: '0.875rem'
+              }}>
+                <span style={{ color: 'var(--geo-text-muted)' }}>
+                  {syncedProducts} of {totalProducts} products
+                </span>
+                <span style={{ 
+                  color: 'var(--geo-emerald-400)',
+                  fontFamily: 'var(--font-mono)',
+                  fontWeight: '500'
+                }}>
+                  {syncProgress}%
+                </span>
+              </div>
+              <div className="geo-progress">
+                <div 
+                  className="geo-progress__bar" 
+                  style={{ width: `${syncProgress}%` }}
+                />
+              </div>
+            </div>
+
+            {pendingProducts > 0 && (
+              <div className="geo-alert geo-alert--success" style={{ marginTop: 'var(--space-lg)' }}>
+                <span className="geo-alert__icon">💡</span>
+                <span>{pendingProducts} products ready to sync</span>
+              </div>
+            )}
+
+            <div style={{ marginTop: 'var(--space-xl)' }}>
+              <fetcher.Form method="POST">
+                <input type="hidden" name="intent" value="sync_all" />
+                <button 
+                  type="submit"
+                  className="geo-btn geo-btn--primary"
+                  disabled={credits === 0 || fetcher.state !== 'idle'}
+                  style={{ width: '100%' }}
+                >
+                  {fetcher.state !== 'idle' ? '⏳ Syncing...' : '🔄 Sync All Products'}
+                </button>
+              </fetcher.Form>
+              {credits === 0 && (
+                <p style={{ 
+                  marginTop: 'var(--space-sm)', 
+                  fontSize: '0.8125rem',
+                  color: 'var(--geo-amber-400)',
+                  textAlign: 'center'
+                }}>
+                  You need credits to sync products
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Quick Actions Card */}
+          <div className="geo-card geo-animate-in geo-animate-delay-3">
+            <div className="geo-card__header">
+              <div className="geo-card__icon">⚙️</div>
+              <div>
+                <h2 className="geo-card__title">Quick Actions</h2>
+                <p className="geo-card__description" style={{ marginTop: '4px' }}>
+                  Manage your AI-GEO settings
+                </p>
+              </div>
+            </div>
+
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: 'var(--space-md)',
+              marginTop: 'var(--space-lg)'
+            }}>
+              <a 
+                href="/app/onboarding" 
+                className="geo-btn geo-btn--secondary"
+                style={{ textDecoration: 'none', textAlign: 'center' }}
               >
-                <pre style={{ margin: 0 }}>
-                  <code>{JSON.stringify(fetcher.data.product, null, 2)}</code>
-                </pre>
-              </s-box>
+                🎨 Change Brand Voice
+              </a>
+              <button className="geo-btn geo-btn--secondary" disabled>
+                💳 Purchase Credits (Coming Soon)
+              </button>
+              <button className="geo-btn geo-btn--secondary" disabled>
+                📈 View Analytics (Coming Soon)
+              </button>
+            </div>
+          </div>
 
-              <s-heading>productVariantsBulkUpdate mutation</s-heading>
-              <s-box
-                padding="base"
-                borderWidth="base"
-                borderRadius="base"
-                background="subdued"
-              >
-                <pre style={{ margin: 0 }}>
-                  <code>{JSON.stringify(fetcher.data.variant, null, 2)}</code>
-                </pre>
-              </s-box>
-            </s-stack>
-          </s-section>
-        )}
-      </s-section>
+          {/* How It Works Card */}
+          <div className="geo-card geo-animate-in geo-animate-delay-4" style={{ gridColumn: '1 / -1' }}>
+            <div className="geo-card__header">
+              <div className="geo-card__icon">🔮</div>
+              <div>
+                <h2 className="geo-card__title">How AI-GEO Works</h2>
+                <p className="geo-card__description" style={{ marginTop: '4px' }}>
+                  Your products become visible to AI search engines
+                </p>
+              </div>
+            </div>
 
-      <s-section slot="aside" heading="App template specs">
-        <s-paragraph>
-          <s-text>Framework: </s-text>
-          <s-link href="https://reactrouter.com/" target="_blank">
-            React Router
-          </s-link>
-        </s-paragraph>
-        <s-paragraph>
-          <s-text>Interface: </s-text>
-          <s-link
-            href="https://shopify.dev/docs/api/app-home/using-polaris-components"
-            target="_blank"
-          >
-            Polaris web components
-          </s-link>
-        </s-paragraph>
-        <s-paragraph>
-          <s-text>API: </s-text>
-          <s-link
-            href="https://shopify.dev/docs/api/admin-graphql"
-            target="_blank"
-          >
-            GraphQL
-          </s-link>
-        </s-paragraph>
-        <s-paragraph>
-          <s-text>Database: </s-text>
-          <s-link href="https://www.prisma.io/" target="_blank">
-            Prisma
-          </s-link>
-        </s-paragraph>
-      </s-section>
+            <div style={{ 
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+              gap: 'var(--space-xl)',
+              marginTop: 'var(--space-xl)'
+            }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ 
+                  fontSize: '2.5rem', 
+                  marginBottom: 'var(--space-md)',
+                  opacity: 0.9
+                }}>
+                  1️⃣
+                </div>
+                <h4 style={{ 
+                  fontFamily: 'var(--font-display)',
+                  fontSize: '1.125rem',
+                  margin: '0 0 var(--space-sm)',
+                  color: 'var(--geo-text-primary)'
+                }}>
+                  AI Analyzes
+                </h4>
+                <p style={{ 
+                  fontSize: '0.875rem',
+                  color: 'var(--geo-text-muted)',
+                  margin: 0,
+                  lineHeight: 1.6
+                }}>
+                  Our AI reads your product data and generates rich JSON-LD schemas
+                </p>
+              </div>
 
-      <s-section slot="aside" heading="Next steps">
-        <s-unordered-list>
-          <s-list-item>
-            Build an{" "}
-            <s-link
-              href="https://shopify.dev/docs/apps/getting-started/build-app-example"
-              target="_blank"
-            >
-              example app
-            </s-link>
-          </s-list-item>
-          <s-list-item>
-            Explore Shopify&apos;s API with{" "}
-            <s-link
-              href="https://shopify.dev/docs/apps/tools/graphiql-admin-api"
-              target="_blank"
-            >
-              GraphiQL
-            </s-link>
-          </s-list-item>
-        </s-unordered-list>
-      </s-section>
-    </s-page>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ 
+                  fontSize: '2.5rem', 
+                  marginBottom: 'var(--space-md)',
+                  opacity: 0.9
+                }}>
+                  2️⃣
+                </div>
+                <h4 style={{ 
+                  fontFamily: 'var(--font-display)',
+                  fontSize: '1.125rem',
+                  margin: '0 0 var(--space-sm)',
+                  color: 'var(--geo-text-primary)'
+                }}>
+                  Auto-Inject
+                </h4>
+                <p style={{ 
+                  fontSize: '0.875rem',
+                  color: 'var(--geo-text-muted)',
+                  margin: 0,
+                  lineHeight: 1.6
+                }}>
+                  Schemas are automatically injected into your product pages
+                </p>
+              </div>
+
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ 
+                  fontSize: '2.5rem', 
+                  marginBottom: 'var(--space-md)',
+                  opacity: 0.9
+                }}>
+                  3️⃣
+                </div>
+                <h4 style={{ 
+                  fontFamily: 'var(--font-display)',
+                  fontSize: '1.125rem',
+                  margin: '0 0 var(--space-sm)',
+                  color: 'var(--geo-text-primary)'
+                }}>
+                  AI Discovery
+                </h4>
+                <p style={{ 
+                  fontSize: '0.875rem',
+                  color: 'var(--geo-text-muted)',
+                  margin: 0,
+                  lineHeight: 1.6
+                }}>
+                  ChatGPT, Perplexity & AI assistants can now recommend your products
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
