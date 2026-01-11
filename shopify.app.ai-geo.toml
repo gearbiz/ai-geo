@@ -1,17 +1,15 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "1780892a19fe6846944db48a31a6e716"
+client_id = "864f80005456fbe6e881bea7a6d898b1"
 name = "AI-GEO"
 application_url = "https://ai-geo.vercel.app"
 embedded = true
 
-[build]
-automatically_update_urls_on_dev = true
-
 [webhooks]
-api_version = "2025-01"
+api_version = "2026-04"
 
 [access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
 scopes = "read_products,write_products"
 
 [auth]
@@ -19,3 +17,6 @@ redirect_urls = [
   "https://ai-geo.vercel.app/auth/callback",
   "https://ai-geo.vercel.app/auth/shopify/callback"
 ]
+
+[build]
+automatically_update_urls_on_dev = true
